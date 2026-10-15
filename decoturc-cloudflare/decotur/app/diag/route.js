@@ -1,13 +1,16 @@
 import { q } from '../../lib/db';
+import { getAjustes } from '../../lib/ajustes';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const hasUrl = !!process.env.DATABASE_URL;
-  try {
-    const { rows } = await q('select count(*)::int as n from productos');
-    return Response.json({ ok: true, hasUrl, productos: rows[0].n });
-  } catch (e) {
-    return Response.json({ ok: false, hasUrl, error: String(e.message) }, { status: 500 });
-  }
+  const pasos = {};
+  const probar = async (nombre, fn) => {
+    try { pasos[nombre] = await fn(); } catch (e) { pasos[nombre] = 'ERROR: ' + String(e.message); }
+  };
+  await probar('ajustes', async () => Object.keys(await getAjustes()).length);
+  await probar('productos', async () => (await q('select id, codigo, color, precio_min, precio_max, estado, foto_url, descripcion from productos')).rows.length);
+  await probar('medidas', async () => (await q('select medida from medidas')).rows.length);
+  await probar('producto_medidas', async () => (await q('select pm.producto_id, m.medida, pm.precio from producto_medidas pm join medidas m on m.id = pm.medida_id')).rows.length);
+  return Response.json({ hasUrl: !!process.env.DATABASE_URL, pasos });
 }
