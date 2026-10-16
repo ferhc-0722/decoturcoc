@@ -37,7 +37,7 @@ export default async function Home() {
             <p>Trabajamos con una amplia variedad de diseños y medidas para living rooms, dormitorios y espacios de trabajo. Te asesoramos para elegir la alfombra que mejor acompaña tu decoración.</p>
             <a className="btn oscuro" href="#catalogo" style={{ marginTop: 14 }}>Explorar colección</a>
           </div>
-          <div className="reveal"><div className="marco"><span>“Cada alfombra cuenta una historia”</span></div></div>
+          <div className="reveal"><div className="marco"><img src="/nosotros.jpg" alt="Alfombra Deco Turco" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /></div></div>
         </div>
         <div className="valores">
           <div className="valor reveal"><div className="icono">✦</div><h3>Diseño</h3><p>Motivos turcos contemporáneos que se adaptan a espacios clásicos y modernos.</p></div>
