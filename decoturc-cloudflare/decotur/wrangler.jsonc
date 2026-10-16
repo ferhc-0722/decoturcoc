@@ -10,5 +10,8 @@
   },
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "NEXT_PUBLIC_WHATSAPP": "51993244145"
   }
 }
