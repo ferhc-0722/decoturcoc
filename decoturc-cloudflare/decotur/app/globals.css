@@ -278,3 +278,8 @@ footer .copy{margin-top:34px;font-size:.7rem;color:#666;letter-spacing:.08em}
 
 
 #inicio .velo{display:none!important}
+
+/* Botones del panel con estado de guardado */
+button.guardando { opacity: .8; cursor: progress; display: inline-flex; align-items: center; gap: 8px; }
+.spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: dt-giro .7s linear infinite; }
+@keyframes dt-giro { to { transform: rotate(360deg); } }

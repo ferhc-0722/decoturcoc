@@ -16,7 +16,7 @@ export default async function Home() {
   const productos = (await q('select id, codigo, color, precio_min, precio_max, estado, foto_url, descripcion from productos order by codigo, color')).rows
     .map((r) => ({ ...r, precio_min: Number(r.precio_min), precio_max: Number(r.precio_max) }));
   const medidas = (await q('select medida from medidas order by id')).rows.map((r) => r.medida);
-  const pm = (await q('select pm.producto_id, m.medida, pm.precio from producto_medidas pm join medidas m on m.id = pm.medida_id order by m.id')).rows;
+  const pm = (await q('select pm.producto_id, m.medida, pm.precio from producto_medidas pm join medidas m on m.id = pm.medida_id where pm.stock > 0 order by m.id')).rows;
   const porProducto = {};
   for (const r of pm) (porProducto[r.producto_id] = porProducto[r.producto_id] || []).push({ medida: r.medida, precio: Number(r.precio) || 0 });
   for (const p of productos) p.medidas = porProducto[p.id] || [];
@@ -24,7 +24,7 @@ export default async function Home() {
   const wsp = aj.whatsapp;
 
   return (
-    <CartProvider>
+    <CartProvider whatsapp={wsp}>
       <Nav whatsapp={wsp} />
       <Hero fondo={aj.fondo_inicio} />
 

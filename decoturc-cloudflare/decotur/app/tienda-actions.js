@@ -22,7 +22,7 @@ export async function crearPedido(datos, items) {
       const qty = Math.trunc(Number(it?.qty));
       if (!Number.isFinite(qty) || qty < 1 || qty > 20) return { ok: false, error: 'Cantidad inválida.' };
       const { rows } = await pool.query(
-        `select p.id, p.codigo, p.color, p.estado, m.medida, pm.precio
+        `select p.id, p.codigo, p.color, p.estado, m.medida, pm.precio, pm.stock
            from producto_medidas pm
            join medidas m on m.id = pm.medida_id
            join productos p on p.id = pm.producto_id
@@ -31,6 +31,7 @@ export async function crearPedido(datos, items) {
       );
       const r = rows[0];
       if (!r) return { ok: false, error: 'Un producto del carrito ya no existe.' };
+      if (Number(r.stock) <= 0) return { ok: false, error: `La medida ${r.medida} cm de ${r.codigo} ${r.color} ya no está disponible.` };
       if (r.estado === 'agotado') return { ok: false, error: `La alfombra ${r.codigo} ${r.color} está agotada.` };
       const precio = Number(r.precio);
       if (!(precio > 0)) return { ok: false, error: `La alfombra ${r.codigo} ${r.color} (${r.medida}) no tiene precio. Consúltanos por WhatsApp.` };
@@ -43,7 +44,7 @@ export async function crearPedido(datos, items) {
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
       [nombre, email, telefono, documento, direccion, ciudad, notas, JSON.stringify(lineas), total]
     );
-    return { ok: true, id: ins.rows[0].id, total, centavos: Math.round(total * 100), email, nombre };
+    return { ok: true, id: ins.rows[0].id, total, lineas, centavos: Math.round(total * 100), email, nombre };
   } catch (e) {
     console.error('crearPedido', e);
     return { ok: false, error: 'No pudimos registrar tu pedido. Inténtalo de nuevo.' };
