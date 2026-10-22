@@ -25,8 +25,7 @@ function mensajeWhatsApp(r, f) {
     f.notas ? `Notas: ${f.notas}` : null,
     '',
     '¿Me confirmas disponibilidad y cómo pagar?',
-  ].filter((x) => x !== null).join('
-');
+  ].filter((x) => x !== null).join('\n');
 }
 
 export function CartProvider({ children, whatsapp = '' }) {
