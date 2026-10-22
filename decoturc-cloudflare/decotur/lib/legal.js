@@ -16,7 +16,7 @@ Todos los precios están expresados en soles (S/). El precio final de cada alfom
 Elige la alfombra y la medida, agrégala al carrito, completa tus datos de entrega y acepta estos términos. Recibirás la confirmación del pedido en el correo que indiques.
 
 5. Medios de pago
-Aceptamos tarjetas de crédito y débito y Yape a través de la pasarela de pagos Culqi, que procesa los pagos de forma segura. Nosotros no almacenamos los datos de tu tarjeta. También podemos recibir pagos por Plin o transferencia bancaria, coordinados por WhatsApp.
+Los pagos se coordinan por WhatsApp y se realizan por Yape, Plin o transferencia bancaria. Te confirmaremos la recepción del pago antes de preparar tu pedido.
 
 6. Entrega
 La entrega se realiza en la dirección que indiques al comprar. El plazo y el costo de envío se coordinan y confirman contigo al momento de la compra.
