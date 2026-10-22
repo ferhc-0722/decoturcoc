@@ -8,20 +8,28 @@ export const useCart = () => useContext(CartCtx) || { items: [], count: 0, add()
 const fmt = (n) => Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const VACIO = { nombre: '', email: '', telefono: '', documento: '', direccion: '', ciudad: '', notas: '' };
 
-function cargarCulqi() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('sin ventana'));
-  if (window.CulqiCheckout) return Promise.resolve();
-  return new Promise((ok, fail) => {
-    const s = document.createElement('script');
-    s.src = 'https://js.culqi.com/checkout-js';
-    s.async = true;
-    s.onload = () => (window.CulqiCheckout ? ok() : fail(new Error('Culqi no cargó')));
-    s.onerror = () => fail(new Error('No se pudo cargar Culqi'));
-    document.body.appendChild(s);
-  });
+// Arma el mensaje con el resumen del pedido que el cliente envía por WhatsApp
+function mensajeWhatsApp(r, f) {
+  const lineas = r.lineas.map((l) => `• ${l.qty} × ${l.codigo} ${l.color} · ${l.medida} cm · S/ ${fmt(l.precio * l.qty)}`);
+  return [
+    `Hola, quiero confirmar mi pedido N° ${r.id} en Deco Turco:`,
+    '',
+    ...lineas,
+    '',
+    `Total: S/ ${fmt(r.total)}`,
+    '',
+    `Nombre: ${f.nombre}`,
+    `Teléfono: ${f.telefono}`,
+    `DNI / CE: ${f.documento || '—'}`,
+    `Entrega: ${f.direccion}, ${f.ciudad}`,
+    f.notas ? `Notas: ${f.notas}` : null,
+    '',
+    '¿Me confirmas disponibilidad y cómo pagar?',
+  ].filter((x) => x !== null).join('
+');
 }
 
-export function CartProvider({ children }) {
+export function CartProvider({ children, whatsapp = '' }) {
   const [items, setItems] = useState([]);
   const [abierto, setAbierto] = useState(false);
   const [paso, setPaso] = useState('carrito'); // carrito | datos | ok
@@ -30,6 +38,7 @@ export function CartProvider({ children }) {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const [pedidoOk, setPedidoOk] = useState(null);
+  const [waUrl, setWaUrl] = useState('');
 
   useEffect(() => {
     try { const s = JSON.parse(localStorage.getItem('dt_cart') || '[]'); if (Array.isArray(s)) setItems(s); } catch (e) {}
@@ -62,67 +71,23 @@ export function CartProvider({ children }) {
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [abierto, cargando]);
 
-  async function cobrar(pedidoId, token) {
-    setCargando(true);
-    try {
-      const r = await fetch('/api/culqi/cargo', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pedidoId, token }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok && d.ok) {
-        setItems([]); setPedidoOk(pedidoId); setPaso('ok');
-      } else {
-        setError(d.error || 'El pago fue rechazado. Revisa los datos de tu tarjeta e inténtalo de nuevo.');
-      }
-    } catch (e) {
-      setError('No pudimos confirmar el pago. Si te cobraron, escríbenos por WhatsApp con tu correo.');
-    }
-    setCargando(false);
-  }
-
   async function pagar(e) {
     e.preventDefault();
     setError('');
     if (!acepto) { setError('Debes aceptar los Términos y condiciones y la Política de cambios y devoluciones.'); return; }
-    const pk = process.env.NEXT_PUBLIC_CULQI_PUBLIC_KEY;
-    if (!pk) { setError('El pago con tarjeta aún no está configurado.'); return; }
+    if (!whatsapp) { setError('No pudimos abrir WhatsApp. Escríbenos directamente a nuestro número.'); return; }
+    // Abrimos la pestaña ahora, mientras el clic todavía cuenta como acción del usuario (evita el bloqueo de ventanas emergentes)
+    const ventana = typeof window !== 'undefined' ? window.open('', '_blank') : null;
     setCargando(true);
     const r = await crearPedido(form, items.map((i) => ({ producto_id: i.producto_id, medida: i.medida, qty: i.qty })));
-    if (!r.ok) { setError(r.error); setCargando(false); return; }
-    try {
-      await cargarCulqi();
-      const [firstName, ...resto] = r.nombre.split(' ');
-      const color = '#A8823F';
-      const culqi = new window.CulqiCheckout(pk, {
-        settings: { title: 'Deco Turco', currency: 'PEN', amount: r.centavos },
-        client: { email: r.email, firstName, lastName: resto.join(' ') || firstName },
-        options: {
-          lang: 'es', installments: false, modal: true,
-          paymentMethods: { tarjeta: true, yape: true, billetera: false, bancaMovil: false, agente: false, cuotealo: false },
-        },
-        appearance: {
-          theme: 'default', hiddenCulqiLogo: false, hiddenBannerContent: false, hiddenBanner: false, hiddenToolBarAmount: false,
-          menuType: 'sidebar', buttonCardPayText: 'Pagar', logo: '',
-          defaultStyle: { bannerColor: color, buttonBackground: color, menuColor: color, linksColor: color, buttonTextColor: '#FFFFFF', priceColor: color },
-        },
-      });
-      culqi.culqi = () => {
-        if (culqi.token) {
-          const id = culqi.token.id;
-          culqi.close();
-          cobrar(r.id, id);
-        } else {
-          setError((culqi.error && (culqi.error.user_message || culqi.error.merchant_message)) || 'No se pudo procesar el pago.');
-          setCargando(false);
-        }
-      };
-      culqi.open();
-      // si el cliente cierra la ventana de Culqi sin pagar, vuelve a habilitar el botón
-      setTimeout(() => setCargando(false), 800);
-    } catch (err) {
-      setError('No pudimos abrir la pasarela de pago. Revisa tu conexión e inténtalo otra vez.');
-      setCargando(false);
-    }
+    if (!r.ok) { if (ventana) ventana.close(); setError(r.error); setCargando(false); return; }
+    const url = `https://wa.me/${whatsapp}?text=${encodeURIComponent(mensajeWhatsApp(r, form))}`;
+    if (ventana) ventana.location.href = url;
+    setWaUrl(url);
+    setItems([]);
+    setPedidoOk(r.id);
+    setPaso('ok');
+    setCargando(false);
   }
 
   const ctx = useMemo(() => ({ items, count, add, abrir }), [items, count, add, abrir]);
@@ -140,9 +105,10 @@ export function CartProvider({ children }) {
 
             {paso === 'ok' && (
               <div className="cart-body">
-                <p className="ok-msg">¡Gracias por tu compra!</p>
-                <p>Tu pago fue aprobado. Tu número de pedido es <b>#{pedidoOk}</b>. Te contactaremos para coordinar la entrega.</p>
-                <button type="button" className="btn solido" onClick={() => setAbierto(false)}>Seguir comprando</button>
+                <p className="ok-msg">¡Pedido registrado!</p>
+                <p>Tu número de pedido es <b>#{pedidoOk}</b>. Envíanos el mensaje por WhatsApp para confirmar tu compra, el pago y la entrega.</p>
+                {waUrl && <a className="btn solido" href={waUrl} target="_blank" rel="noopener">Abrir WhatsApp</a>}
+                <button type="button" className="btn" style={{ marginTop: 10 }} onClick={() => setAbierto(false)}>Seguir comprando</button>
               </div>
             )}
 
@@ -194,9 +160,9 @@ export function CartProvider({ children }) {
                 </div>
                 <div className="cart-foot">
                   <div className="cart-total"><span>Total a pagar</span><b>S/ {fmt(total)}</b></div>
-                  <button className="btn solido" disabled={cargando}>{cargando ? 'Procesando…' : 'Pagar con tarjeta o Yape'}</button>
+                  <button className="btn solido" disabled={cargando}>{cargando ? 'Enviando…' : 'Enviar pedido por WhatsApp'}</button>
                   <button type="button" className="cart-back" onClick={() => { setPaso('carrito'); setError(''); }} disabled={cargando}>← Volver al carrito</button>
-                  <p className="nota">Pago seguro procesado por Culqi. No guardamos los datos de tu tarjeta.</p>
+                  <p className="nota">Registramos tu pedido y te confirmamos por WhatsApp. Pagas por Yape, Plin o transferencia.</p>
                 </div>
               </form>
             )}

@@ -67,7 +67,7 @@ export default function Catalog({ productos, whatsapp, pagos = {} }) {
 function Tarjeta({ grupo, onAbrir }) {
   const [sel, setSel] = useState(grupo.variantes[0].id);
   const v = grupo.variantes.find((x) => x.id === sel) || grupo.variantes[0];
-  const agotado = v.estado === 'agotado';
+  const agotado = v.estado === 'agotado' || v.medidas.length === 0;
   return (
     <article className={`pc ${agotado ? 'agotado' : ''}`}>
       <button type="button" className="foto pc-foto" onClick={() => onAbrir(v.id)} aria-label={`Ver alfombra ${grupo.codigo} ${v.color}`}>
@@ -103,7 +103,7 @@ function Detalle({ grupo, inicial, whatsapp, pagos, onCerrar }) {
   const [id, setId] = useState(inicial);
   const [medida, setMedida] = useState(null);
   const v = grupo.variantes.find((x) => x.id === id) || grupo.variantes[0];
-  const agotado = v.estado === 'agotado';
+  const agotado = v.estado === 'agotado' || v.medidas.length === 0;
   const sel = v.medidas.find((m) => m.medida === medida);
   const { add, abrir } = useCart();
   const agregar = () => {
