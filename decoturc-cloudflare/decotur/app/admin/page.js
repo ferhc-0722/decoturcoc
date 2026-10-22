@@ -2,6 +2,7 @@ import { isAdmin } from '../../lib/auth';
 import { q } from '../../lib/db';
 import { getAjustes } from '../../lib/ajustes';
 import { loginAction, logoutAction, saveAjustes, saveProduct, createProduct, deleteProduct, createMovement, deleteMovement, savePreciosTier, responderReclamo } from '../actions';
+import BotonEnvio from '../../components/BotonEnvio';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ function Login({ error }) {
         {error && <p style={{ color: '#e88', marginBottom: 10 }}>Clave incorrecta</p>}
         <label>Clave</label>
         <input type="password" name="password" required />
-        <button>Ingresar</button>
+        <BotonEnvio pendingText="Ingresando…">Ingresar</BotonEnvio>
       </form>
     </div>
   );
@@ -82,7 +83,7 @@ export default async function Admin({ searchParams }) {
                   <td><input type="number" name={`m_${m.mid}_stock`} defaultValue={m.stock} /></td></tr>
               ))}
             </tbody></table>
-            <p style={{ marginTop: 18 }}><button>Guardar cambios</button></p>
+            <p style={{ marginTop: 18 }}><BotonEnvio>Guardar cambios</BotonEnvio></p>
           </form>
         </div>
         <div className="card-a">
@@ -96,7 +97,7 @@ export default async function Admin({ searchParams }) {
           <form action={deleteProduct} style={{ marginTop: 10 }}>
             <input type="hidden" name="id" value={p.id} />
             <label><input type="checkbox" name="confirmar" value="si" style={{ width: 'auto', marginRight: 8 }} />Confirmo que quiero eliminar este producto</label>
-            <p style={{ marginTop: 10 }}><button className="peligro">Eliminar</button></p>
+            <p style={{ marginTop: 10 }}><BotonEnvio className="peligro" pendingText="Eliminando…">Eliminar</BotonEnvio></p>
           </form>
         </div>
       </>
@@ -135,7 +136,7 @@ export default async function Admin({ searchParams }) {
             <div><label>Precio mín.</label><input type="number" step="0.01" name="precio_min" defaultValue="0" /></div>
             <div><label>Precio máx.</label><input type="number" step="0.01" name="precio_max" defaultValue="0" /></div>
             <div><label>Stock</label><input type="number" name="stock" defaultValue="0" /></div>
-            <div><button>Agregar</button></div>
+            <div><BotonEnvio>Agregar</BotonEnvio></div>
           </form>
         </div>
       </>
@@ -172,7 +173,7 @@ export default async function Admin({ searchParams }) {
               {prods.map((p) => <option key={p.id} value={p.id}>{p.codigo} {p.color}</option>)}
             </select></div>
             <div><label>Cantidad (piezas)</label><input type="number" name="cantidad" defaultValue="0" /></div>
-            <div><button>Guardar</button></div>
+            <div><BotonEnvio>Guardar</BotonEnvio></div>
           </form>
         </div>
         <div className="card-a">
@@ -197,7 +198,7 @@ export default async function Admin({ searchParams }) {
                   <td>
                     <form action={deleteMovement}>
                       <input type="hidden" name="id" value={m.id} />
-                      <button className="peligro">X</button>
+                      <BotonEnvio className="peligro" pendingText="…">X</BotonEnvio>
                     </form>
                   </td>
                 </tr>
@@ -235,7 +236,7 @@ export default async function Admin({ searchParams }) {
                       <input type="number" step="0.01" min="0" name={`p_${m.id}`} defaultValue={igual ? Number(c.mn) : ''} placeholder={c && c.mn != null ? 'varios' : 'sin precio'} /></div>
                   );
                 })}
-                <div><button>Aplicar a este grupo</button></div>
+                <div><BotonEnvio>Aplicar a este grupo</BotonEnvio></div>
               </div>
             </form>
           </div>
@@ -288,8 +289,8 @@ export default async function Admin({ searchParams }) {
               <label>Respuesta / acciones adoptadas</label>
               <textarea name="respuesta" rows={3} defaultValue={r.respuesta || ''} style={{ width: '100%', padding: 8, border: '1px solid #ccc', font: 'inherit' }} />
               <p style={{ marginTop: 8 }}>
-                <button name="estado" value="atendido">Guardar y marcar atendido</button>{' '}
-                <button name="estado" value="pendiente" className="sec">Guardar como pendiente</button>
+                <BotonEnvio name="estado" value="atendido">Guardar y marcar atendido</BotonEnvio>{' '}
+                <BotonEnvio name="estado" value="pendiente" className="sec">Guardar como pendiente</BotonEnvio>
               </p>
             </form>
           </div>
@@ -329,7 +330,7 @@ export default async function Admin({ searchParams }) {
           <div style={{ gridColumn: '1 / -1' }}><h3 style={{ marginTop: 10 }}>Textos legales</h3><p className="hint">Si los dejas vacíos se muestra un texto base. Revísalos y ajústalos a tu negocio (plazos, costos de envío, etc.); conviene que los valide un abogado. Se ven en /terminos y /devoluciones.</p></div>
           <div style={{ gridColumn: '1 / -1' }}><label>Términos y condiciones</label><textarea name="terminos" rows={8} defaultValue={aj.terminos} placeholder="Vacío = texto base" style={{ width: '100%', padding: 8, border: '1px solid #ccc', font: 'inherit' }} /></div>
           <div style={{ gridColumn: '1 / -1' }}><label>Política de cambios y devoluciones</label><textarea name="devoluciones" rows={8} defaultValue={aj.devoluciones} placeholder="Vacío = texto base" style={{ width: '100%', padding: 8, border: '1px solid #ccc', font: 'inherit' }} /></div>
-          <div><button>Guardar cambios</button></div>
+          <div><BotonEnvio>Guardar cambios</BotonEnvio></div>
         </form>
         <p className="hint" style={{ marginTop: 14 }}>El número de WhatsApp se usa en todos los botones de la web y en el pie de página. Si lo dejas vacío se usa el de la variable NEXT_PUBLIC_WHATSAPP de Vercel.</p>
       </div>
@@ -340,7 +341,7 @@ export default async function Admin({ searchParams }) {
     <div className="adm">
       <header>
         <div><b>DECO TURCO</b> · Panel de gestión</div>
-        <form action={logoutAction}><button className="sec">Salir</button></form>
+        <form action={logoutAction}><BotonEnvio className="sec" pendingText="Saliendo…">Salir</BotonEnvio></form>
       </header>
       <nav>
         <a href="?tab=resumen" className={tab === 'resumen' ? 'on' : ''}>Resumen</a>
