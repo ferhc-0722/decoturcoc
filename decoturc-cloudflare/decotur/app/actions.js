@@ -54,6 +54,18 @@ export async function marcarPedidoFallido(formData) {
   refrescar();
 }
 
+export async function marcarPedidoAprobado(formData) {
+  needAdmin();
+  const id = Math.trunc(num(formData.get('id')));
+  if (id < 1) return;
+  // El stock ya se reservó al crear el pedido; aprobar solo cambia su estado.
+  await pool.query(
+    "update pedidos set estado='aprobado' where id=$1 and estado='pendiente'",
+    [id]
+  );
+  refrescar();
+}
+
 export async function saveProduct(formData) {
   needAdmin();
   const id = num(formData.get('id'));
