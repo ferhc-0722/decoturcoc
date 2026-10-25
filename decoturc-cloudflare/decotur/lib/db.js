@@ -1,23 +1,23 @@
-import { Pool } from '@neondatabase/serverless';
+import { neon, Pool } from '@neondatabase/serverless';
 
-// Workers no permite reutilizar conexiones creadas durante otra solicitud.
-// Crear y cerrar cada pool evita el error 1101 por I/O entre solicitudes.
-function createPool() {
-  return new Pool({ connectionString: process.env.DATABASE_URL || '' });
+// HTTP queries are stateless and safe to reuse across Workers requests.
+// Keep WebSocket pools local to explicit transactions and close them before release.
+const g = globalThis;
+
+function getHttpQuery() {
+  if (!g.__neonHttpQuery) {
+    g.__neonHttpQuery = neon(process.env.DATABASE_URL || '', { fullResults: true });
+  }
+  return g.__neonHttpQuery;
 }
 
 export const pool = {
-  async query(...args) {
-    const p = createPool();
-    try {
-      return await p.query(...args);
-    } finally {
-      await p.end();
-    }
+  query(...args) {
+    return getHttpQuery().query(...args);
   },
 
   async connect() {
-    const p = createPool();
+    const p = new Pool({ connectionString: process.env.DATABASE_URL || '' });
     try {
       const client = await p.connect();
       const release = client.release.bind(client);
