@@ -1,23 +1,39 @@
 import { Pool } from '@neondatabase/serverless';
 
-// Driver compatible con Cloudflare Workers (usa WebSocket, no sockets TCP).
-// La conexión se crea en la primera consulta, cuando ya existe DATABASE_URL.
-const g = globalThis;
-
-function getPool() {
-  if (!g.__neonPool) {
-    g.__neonPool = new Pool({ connectionString: process.env.DATABASE_URL || '' });
-  }
-  return g.__neonPool;
+// Workers no permite reutilizar conexiones creadas durante otra solicitud.
+// Crear y cerrar cada pool evita el error 1101 por I/O entre solicitudes.
+function createPool() {
+  return new Pool({ connectionString: process.env.DATABASE_URL || '' });
 }
 
-// Mantiene la misma API que antes: pool.query(...), pool.connect(), etc.
-export const pool = new Proxy({}, {
-  get(_, prop) {
-    const p = getPool();
-    const v = p[prop];
-    return typeof v === 'function' ? v.bind(p) : v;
+export const pool = {
+  async query(...args) {
+    const p = createPool();
+    try {
+      return await p.query(...args);
+    } finally {
+      await p.end();
+    }
   },
-});
+
+  async connect() {
+    const p = createPool();
+    try {
+      const client = await p.connect();
+      const release = client.release.bind(client);
+      let closed = false;
+      client.release = async (...args) => {
+        if (closed) return;
+        closed = true;
+        release(...args);
+        await p.end();
+      };
+      return client;
+    } catch (error) {
+      await p.end();
+      throw error;
+    }
+  },
+};
 
 export const q = (text, params) => pool.query(text, params);
