@@ -1,7 +1,7 @@
 import { isAdmin } from '../../lib/auth';
 import { q } from '../../lib/db';
 import { getAjustes } from '../../lib/ajustes';
-import { loginAction, logoutAction, saveAjustes, saveProduct, createProduct, deleteProduct, createMovement, deleteMovement, savePreciosTier, responderReclamo } from '../actions';
+import { loginAction, logoutAction, saveAjustes, saveProduct, createProduct, deleteProduct, createMovement, deleteMovement, savePreciosTier, responderReclamo, marcarPedidoFallido } from '../actions';
 import BotonEnvio from '../../components/BotonEnvio';
 
 export const dynamic = 'force-dynamic';
@@ -261,7 +261,7 @@ export default async function Admin({ searchParams }) {
                 <td>{p.direccion}, {p.ciudad}{p.notas ? <><br /><small>{p.notas}</small></> : null}</td>
                 <td>{(p.items || []).map((i, k) => <div key={k}>{i.qty} × {i.codigo} {i.color} · {i.medida}</div>)}</td>
                 <td>{S(p.total)}</td>
-                <td className={p.estado === 'pagado' ? 'disp' : p.estado === 'fallido' ? 'agot' : ''}>{p.estado}{p.error ? <><br /><small>{p.error}</small></> : null}</td>
+                <td className={p.estado === 'pagado' ? 'disp' : p.estado === 'fallido' ? 'agot' : ''}>{p.estado}{p.error ? <><br /><small>{p.error}</small></> : null}{p.estado === 'pendiente' && <form action={marcarPedidoFallido} style={{ marginTop: 6 }}><input type='hidden' name='id' value={p.id} /><BotonEnvio className='peligro' pendingText='Liberando…'>Cancelar y liberar stock</BotonEnvio></form>}</td>
               </tr>
             ))}
             {ps.length === 0 && <tr><td colSpan={7}>Aún no hay pedidos.</td></tr>}
