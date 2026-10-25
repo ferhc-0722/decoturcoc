@@ -1,6 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { pool } from '../lib/db';
 import { isAdmin, startSession, endSession } from '../lib/auth';
 
@@ -10,13 +11,20 @@ const txt = (v) => (v == null ? '' : String(v).trim());
 const refrescar = () => { revalidatePath('/'); revalidatePath('/admin'); };
 
 export async function loginAction(formData) {
-  const ok = startSession(txt(formData.get('password')));
+  const ip = headers().get('cf-connecting-ip') || 'unknown';
+  const ok = await startSession(txt(formData.get('password')), ip);
   redirect(ok ? '/admin' : '/admin?error=1');
 }
 
 export async function logoutAction() {
   endSession();
   redirect('/admin');
+}
+
+export async function marcarPedidoFallido(formData) {
+  needAdmin();
+  await pool.query("update pedidos set estado='fallido' where id=$1 and estado='pendiente'", [num(formData.get('id'))]);
+  refrescar();
 }
 
 export async function saveProduct(formData) {
