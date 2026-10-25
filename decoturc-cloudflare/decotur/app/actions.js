@@ -23,7 +23,34 @@ export async function logoutAction() {
 
 export async function marcarPedidoFallido(formData) {
   needAdmin();
-  await pool.query("update pedidos set estado='fallido' where id=$1 and estado='pendiente'", [num(formData.get('id'))]);
+  const id = num(formData.get('id'));
+  const c = await pool.connect();
+  try {
+    await c.query('begin');
+    const pedido = (await c.query("select items from pedidos where id=$1 and estado='pendiente' for update", [id])).rows[0];
+    if (pedido) {
+      const lineas = Array.isArray(pedido.items) ? pedido.items : JSON.parse(pedido.items || '[]');
+      const cantidades = new Map();
+      for (const item of lineas) {
+        const key = String(item.producto_id) + ':' + String(item.medida);
+        cantidades.set(key, (cantidades.get(key) || 0) + Math.trunc(num(item.qty)));
+      }
+      for (const [key, cantidad] of cantidades) {
+        const parts = key.split(':');
+        await c.query(
+          'update producto_medidas pm set stock=pm.stock+$3 from medidas m where pm.producto_id=$1 and pm.medida_id=m.id and m.medida=$2',
+          [Number(parts[0]), parts.slice(1).join(':'), cantidad]
+        );
+      }
+      await c.query("update pedidos set estado='fallido' where id=$1", [id]);
+    }
+    await c.query('commit');
+  } catch (e) {
+    await c.query('rollback');
+    throw e;
+  } finally {
+    await c.release();
+  }
   refrescar();
 }
 
@@ -66,7 +93,7 @@ export async function saveProduct(formData) {
     await c.query('rollback');
     throw e;
   } finally {
-    c.release();
+    await c.release();
   }
   refrescar();
 }
@@ -115,7 +142,7 @@ export async function createMovement(formData) {
     await c.query('rollback');
     throw e;
   } finally {
-    c.release();
+    await c.release();
   }
   refrescar();
 }
@@ -138,7 +165,7 @@ export async function deleteMovement(formData) {
     await c.query('rollback');
     throw e;
   } finally {
-    c.release();
+    await c.release();
   }
   refrescar();
 }
