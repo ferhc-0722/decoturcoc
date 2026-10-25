@@ -1,19 +1,16 @@
-import { neon, Pool } from '@neondatabase/serverless';
+import { Pool } from '@neondatabase/serverless';
 
-// HTTP queries are stateless and safe to reuse across Workers requests.
-// Keep WebSocket pools local to explicit transactions and close them before release.
-const g = globalThis;
-
-function getHttpQuery() {
-  if (!g.__neonHttpQuery) {
-    g.__neonHttpQuery = neon(process.env.DATABASE_URL || '', { fullResults: true });
-  }
-  return g.__neonHttpQuery;
-}
-
+// Keep each database pool inside the request/query that uses it. Cloudflare
+// Workers can reuse a module between requests, so a module-level pool can
+// carry I/O state into a different request.
 export const pool = {
-  query(...args) {
-    return getHttpQuery().query(...args);
+  async query(...args) {
+    const p = new Pool({ connectionString: process.env.DATABASE_URL || '' });
+    try {
+      return await p.query(...args);
+    } finally {
+      await p.end();
+    }
   },
 
   async connect() {
