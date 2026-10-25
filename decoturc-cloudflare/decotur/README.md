@@ -36,7 +36,7 @@ npm run cf:deploy
 La aplicación usa OpenNext para Cloudflare Workers.
 
 ## Operación de pedidos
-Al insertar un pedido, PostgreSQL bloquea y descuenta el stock de cada medida en la misma transacción. Si falta stock, se rechaza el pedido completo. En el panel de pedidos, marca como fallido un pedido pendiente para liberar las unidades reservadas. Los pedidos pagados conservan el descuento.
+Al insertar un pedido, PostgreSQL bloquea y descuenta el stock de cada medida en la misma transacción. El cliente de Neon se crea y cierra por operación para no reutilizar conexiones entre solicitudes de Workers. Si falta stock, se rechaza el pedido completo. En el panel de pedidos, marca como fallido un pedido pendiente para liberar las unidades reservadas. Los pedidos pagados conservan el descuento.
 
 ## Personalización
 - Fondos, contacto, redes y métodos de pago: `/admin` → Diseño y contacto.
