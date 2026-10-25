@@ -19,6 +19,11 @@ create table if not exists pedidos (
   error text
 );
 
+-- Permite registrar la aprobación manual en pedidos ya existentes.
+alter table pedidos drop constraint if exists pedidos_estado_check;
+alter table pedidos add constraint pedidos_estado_check
+  check (estado in ('pendiente','pagado','fallido','aprobado'));
+
 create table if not exists reclamos (
   id serial primary key,
   codigo text unique,
