@@ -33,6 +33,7 @@ export function isAdmin() {
 export async function startSession(password, ip) {
   if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_SECRET) return false;
   const hash = ipHash(ip);
+  await pool.query('create table if not exists admin_login_attempts (ip_hash text primary key, window_started timestamptz not null default now(), failed_attempts int not null default 0)');
   const { rows } = await pool.query(
     'select failed_attempts, window_started from admin_login_attempts where ip_hash=$1',
     [hash]
