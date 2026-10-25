@@ -13,5 +13,11 @@
   },
   "vars": {
     "NEXT_PUBLIC_WHATSAPP": "51993244145"
-  }
+  },
+  "routes": [
+    {
+      "pattern": "decoturco.dev",
+      "custom_domain": true
+    }
+  ]
 }

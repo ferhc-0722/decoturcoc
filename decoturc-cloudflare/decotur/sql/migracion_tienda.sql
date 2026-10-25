@@ -19,6 +19,11 @@ create table if not exists pedidos (
   error text
 );
 
+-- Permite registrar la aprobación manual en pedidos ya existentes.
+alter table pedidos drop constraint if exists pedidos_estado_check;
+alter table pedidos add constraint pedidos_estado_check
+  check (estado in ('pendiente','pagado','fallido','aprobado'));
+
 create table if not exists reclamos (
   id serial primary key,
   codigo text unique,
@@ -60,3 +65,10 @@ insert into ajustes (clave, valor) values
   ('direccion', 'Tu dirección aquí'),
   ('horario', 'Lunes a sábado · 10:00 – 19:00')
 on conflict (clave) do nothing;
+
+-- Persistentes, por IP hasheada, para limitar intentos de inicio de sesión.
+create table if not exists admin_login_attempts (
+  ip_hash text primary key,
+  window_started timestamptz not null default now(),
+  failed_attempts int not null default 0
+);

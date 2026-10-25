@@ -16,35 +16,66 @@ export async function crearPedido(datos, items) {
     if (!Array.isArray(items) || items.length === 0 || items.length > 30) {
       return { ok: false, error: 'Tu carrito está vacío.' };
     }
-    const lineas = [];
-    let total = 0;
+
+    const agrupados = new Map();
     for (const it of items) {
+      const producto_id = Number(it?.producto_id);
+      const medida = txt(it?.medida, 30);
       const qty = Math.trunc(Number(it?.qty));
-      if (!Number.isFinite(qty) || qty < 1 || qty > 20) return { ok: false, error: 'Cantidad inválida.' };
-      const { rows } = await pool.query(
-        `select p.id, p.codigo, p.color, p.estado, m.medida, pm.precio, pm.stock
-           from producto_medidas pm
-           join medidas m on m.id = pm.medida_id
-           join productos p on p.id = pm.producto_id
-          where p.id = $1 and m.medida = $2`,
-        [Number(it?.producto_id), String(it?.medida)]
-      );
-      const r = rows[0];
-      if (!r) return { ok: false, error: 'Un producto del carrito ya no existe.' };
-      if (Number(r.stock) <= 0) return { ok: false, error: `La medida ${r.medida} cm de ${r.codigo} ${r.color} ya no está disponible.` };
-      if (r.estado === 'agotado') return { ok: false, error: `La alfombra ${r.codigo} ${r.color} está agotada.` };
-      const precio = Number(r.precio);
-      if (!(precio > 0)) return { ok: false, error: `La alfombra ${r.codigo} ${r.color} (${r.medida}) no tiene precio. Consúltanos por WhatsApp.` };
-      lineas.push({ producto_id: r.id, codigo: r.codigo, color: r.color, medida: r.medida, precio, qty });
-      total += precio * qty;
+      if (!Number.isInteger(producto_id) || producto_id < 1 || !medida || !Number.isFinite(qty) || qty < 1 || qty > 20) {
+        return { ok: false, error: 'Producto, medida o cantidad inválidos.' };
+      }
+      const key = String(producto_id) + ':' + medida;
+      const acumulado = (agrupados.get(key)?.qty || 0) + qty;
+      if (acumulado > 20) return { ok: false, error: 'La cantidad máxima por medida es 20.' };
+      agrupados.set(key, { producto_id, medida, qty: acumulado });
     }
-    total = Math.round(total * 100) / 100;
-    const ins = await pool.query(
-      `insert into pedidos (nombre, email, telefono, documento, direccion, ciudad, notas, items, total)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-      [nombre, email, telefono, documento, direccion, ciudad, notas, JSON.stringify(lineas), total]
-    );
-    return { ok: true, id: ins.rows[0].id, total, lineas, centavos: Math.round(total * 100), email, nombre };
+
+    const c = await pool.connect();
+    try {
+      await c.query('begin');
+      const lineas = [];
+      let total = 0;
+      for (const it of agrupados.values()) {
+        const { rows } = await c.query(
+          'select p.id, p.codigo, p.color, p.estado, m.medida, pm.precio, pm.stock from producto_medidas pm join medidas m on m.id=pm.medida_id join productos p on p.id=pm.producto_id where p.id=$1 and m.medida=$2 for update of pm,p',
+          [it.producto_id, it.medida]
+        );
+        const r = rows[0];
+        if (!r) throw new Error('Un producto del carrito ya no existe.');
+        if (r.estado === 'agotado') throw new Error('La alfombra ' + r.codigo + ' ' + r.color + ' está agotada.');
+        if (Number(r.stock) < it.qty) throw new Error('Stock insuficiente para ' + r.codigo + ' ' + r.color + ', medida ' + r.medida + ' cm. Disponibles: ' + r.stock + '.');
+        const precio = Number(r.precio);
+        if (!(precio > 0)) throw new Error('La alfombra ' + r.codigo + ' ' + r.color + ' (' + r.medida + ') no tiene precio. Consúltanos por WhatsApp.');
+        lineas.push({ producto_id: r.id, codigo: r.codigo, color: r.color, medida: r.medida, precio, qty: it.qty });
+        total += precio * it.qty;
+      }
+      total = Math.round(total * 100) / 100;
+
+      for (const it of agrupados.values()) {
+        const upd = await c.query(
+          'update producto_medidas pm set stock=pm.stock-$3 from medidas m where pm.producto_id=$1 and pm.medida_id=m.id and m.medida=$2 and pm.stock >= $3',
+          [it.producto_id, it.medida, it.qty]
+        );
+        if (upd.rowCount !== 1) throw new Error('El stock cambió mientras registrábamos el pedido. Actualiza tu carrito e inténtalo otra vez.');
+      }
+
+      const ins = await c.query(
+        'insert into pedidos (nombre,email,telefono,documento,direccion,ciudad,notas,items,total) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id',
+        [nombre, email, telefono, documento, direccion, ciudad, notas, JSON.stringify(lineas), total]
+      );
+      await c.query('commit');
+      return { ok: true, id: ins.rows[0].id, total, lineas, centavos: Math.round(total * 100), email, nombre };
+    } catch (e) {
+      await c.query('rollback');
+      const mensaje = String(e?.message || '');
+      if (mensaje.includes('ya no existe') || mensaje.includes('agotada') || mensaje.includes('Stock insuficiente') || mensaje.includes('no tiene precio') || mensaje.includes('stock cambió')) {
+        return { ok: false, error: mensaje };
+      }
+      throw e;
+    } finally {
+      await c.release();
+    }
   } catch (e) {
     console.error('crearPedido', e);
     return { ok: false, error: 'No pudimos registrar tu pedido. Inténtalo de nuevo.' };
@@ -85,7 +116,7 @@ export async function crearReclamo(f) {
       await c.query('rollback');
       throw e;
     } finally {
-      c.release();
+      await c.release();
     }
   } catch (e) {
     console.error('crearReclamo', e);
