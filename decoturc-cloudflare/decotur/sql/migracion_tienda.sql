@@ -60,3 +60,73 @@ insert into ajustes (clave, valor) values
   ('direccion', 'Tu dirección aquí'),
   ('horario', 'Lunes a sábado · 10:00 – 19:00')
 on conflict (clave) do nothing;
+
+-- Persistentes, por IP hasheada, para limitar intentos de inicio de sesión.
+create table if not exists admin_login_attempts (
+  ip_hash text primary key,
+  window_started timestamptz not null default now(),
+  failed_attempts int not null default 0
+);
+
+-- Reserva el stock de cada medida dentro de la transacción que crea el pedido.
+create or replace function reservar_stock_pedido()
+returns trigger language plpgsql as $$
+declare
+  linea record;
+  actualizado integer;
+begin
+  for linea in
+    select (item->>'producto_id')::integer as producto_id,
+           item->>'medida' as medida,
+           sum((item->>'qty')::integer)::integer as cantidad
+      from jsonb_array_elements(new.items) as item
+     group by (item->>'producto_id')::integer, item->>'medida'
+     order by (item->>'producto_id')::integer, item->>'medida'
+  loop
+    if linea.producto_id is null or linea.medida is null or linea.cantidad < 1 then
+      raise exception 'Producto, medida o cantidad invalidos en el pedido';
+    end if;
+    update producto_medidas pm set stock = pm.stock - linea.cantidad
+      from medidas m
+     where pm.producto_id = linea.producto_id and pm.medida_id = m.id
+       and m.medida = linea.medida and pm.stock >= linea.cantidad;
+    get diagnostics actualizado = row_count;
+    if actualizado <> 1 then
+      raise exception 'Stock insuficiente para producto % medida %',
+        linea.producto_id, linea.medida using errcode = 'P0001';
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+drop trigger if exists pedidos_reservar_stock on pedidos;
+create trigger pedidos_reservar_stock
+before insert on pedidos for each row execute function reservar_stock_pedido();
+
+-- Al cancelar (fallido) un pedido pendiente, devuelve las unidades una sola vez.
+create or replace function liberar_stock_pedido_fallido()
+returns trigger language plpgsql as $$
+declare
+  linea record;
+begin
+  if old.estado = 'pendiente' and new.estado = 'fallido' then
+    for linea in
+      select (item->>'producto_id')::integer as producto_id,
+             item->>'medida' as medida,
+             sum((item->>'qty')::integer)::integer as cantidad
+        from jsonb_array_elements(old.items) as item
+       group by (item->>'producto_id')::integer, item->>'medida'
+       order by (item->>'producto_id')::integer, item->>'medida'
+    loop
+      update producto_medidas pm set stock = pm.stock + linea.cantidad
+        from medidas m
+       where pm.producto_id = linea.producto_id and pm.medida_id = m.id
+         and m.medida = linea.medida;
+    end loop;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists pedidos_liberar_stock_fallido on pedidos;
+create trigger pedidos_liberar_stock_fallido
+after update of estado on pedidos for each row execute function liberar_stock_pedido_fallido();
